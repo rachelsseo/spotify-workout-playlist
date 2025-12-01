@@ -24,7 +24,8 @@ The top 20 artists appear in over 4,000 playlists combined, with clear "workout 
 
 ### Plot / Visualization
 
-![Top Artists](data/analytics/top_artists.png)
+<img width="5297" height="2953" alt="top_artists" src="https://github.com/user-attachments/assets/c1e97509-2e1c-450e-b058-6dad49e0a7f2" />
+
 *Top 20 artists in workout music by playlist appearances (left) and track variety vs. popularity bubble chart (right). Bubble size represents playlist appearances, revealing that track count doesn't necessarily correlate with dominance - it's about having the right tracks for workout contexts.*
 
 ### GitHub Repository Link
