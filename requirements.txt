@@ -1,18 +1,13 @@
-# Core dependencies
-prefect>=3.0.0,<4.0.0        # Use latest Prefect 3.x to avoid pendulum 2‑x conflicts
+prefect>=3.0.0,<4.0.0       
 spotipy==2.23.0
 requests==2.31.0
-duckdb                     # Use latest DuckDB — rely on their wheels for 3.14
-pandas>=2.3.3,<3.0.0        # Pandas 2.3.3 adds Python 3.14 support
-numpy                       # Let pip pick latest numpy version compatible with 3.14
+duckdb                    
+pandas>=2.3.3,<3.0.0        
+numpy                       
 python-dotenv==1.0.0
-
-# Analysis & Visualization
 matplotlib               
 seaborn                  
 plotly                    
 scikit-learn               
-
-# Jupyter / Notebook
 jupyter                  
 ipykernel                  
