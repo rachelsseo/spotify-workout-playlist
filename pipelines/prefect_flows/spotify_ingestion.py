@@ -15,8 +15,7 @@ load_dotenv()
 API_RATE_LIMIT_DELAY = 0.15
 BATCH_SIZE = 500
 
-def clean_string(s: str) -> str:
-    """Clean string for deduplication"""
+def clean_string(s: str) -> str: # cleaning string for deduplication
     if not s:
         return ""
     s = re.sub(r'[^\w\s]', '', s.lower())
@@ -31,9 +30,8 @@ def get_spotify_client():
         )
     )
 
-@task(retries=3, retry_delay_seconds=10)
+@task(retries=3, retry_delay_seconds=10) # search for playlists
 def search_playlists(query: str, limit: int = 50) -> List[Dict]:
-    """Search for playlists"""
     sp = get_spotify_client()
     time.sleep(API_RATE_LIMIT_DELAY)
     
@@ -59,9 +57,8 @@ def search_playlists(query: str, limit: int = 50) -> List[Dict]:
         print(f"Error searching '{query}': {e}")
         return []
 
-@task(retries=3, retry_delay_seconds=10)
+@task(retries=3, retry_delay_seconds=10) # fetch tracks from playlists
 def fetch_playlist_tracks(playlist_id: str) -> List[Dict]:
-    """Fetch all tracks from playlist"""
     sp = get_spotify_client()
     all_tracks = []
     offset = 0
@@ -82,7 +79,7 @@ def fetch_playlist_tracks(playlist_id: str) -> List[Dict]:
                 if not track or not track.get('id'):
                     continue
                 
-                # Skip invalid durations
+                # skip invalid durations
                 duration = track.get('duration_ms', 0)
                 if duration < 30000 or duration > 600000:
                     continue
@@ -126,12 +123,11 @@ def fetch_playlist_tracks(playlist_id: str) -> List[Dict]:
     return all_tracks
 
 @task
-def save_to_duckdb(playlists: List[Dict], tracks: List[Dict]):
-    """Save data to DuckDB"""
+def save_to_duckdb(playlists: List[Dict], tracks: List[Dict]): # save data to DuckDB
     conn = duckdb.connect('data/processed/spotify.duckdb')
     
     try:
-        # Save playlists
+        # save playlists
         if playlists:
             conn.executemany("""
                 INSERT OR REPLACE INTO playlists 
@@ -141,7 +137,7 @@ def save_to_duckdb(playlists: List[Dict], tracks: List[Dict]):
             """, [(p['playlist_id'], date.today(), p['playlist_name'], p['owner'],
                    p['follower_count'], p['total_tracks'], p['category']) for p in playlists])
         
-        # Save tracks
+        # save tracks
         if tracks:
             conn.executemany("""
                 INSERT OR IGNORE INTO tracks 
@@ -153,7 +149,7 @@ def save_to_duckdb(playlists: List[Dict], tracks: List[Dict]):
                    t['release_year'], t['duration_ms'], t['popularity'], 
                    t['explicit']) for t in tracks])
             
-            # Save playlist-track associations
+            # save playlist-track relationships
             conn.executemany("""
                 INSERT OR IGNORE INTO playlist_tracks 
                 (playlist_id, track_id, snapshot_date)
@@ -168,11 +164,9 @@ def save_to_duckdb(playlists: List[Dict], tracks: List[Dict]):
     finally:
         conn.close()
 
-@flow(name="Playlist Collection", log_prints=True)
+@flow(name="Playlist Collection", log_prints=True) 
 def playlist_collect():
-    """Playlist collection to reach 50K+ records"""
-    
-    # Focused search queries (high-volume)
+    # focusing search queries
     queries = [
         'workout', 'gym', 'fitness', 'running', 'cardio',
         'HIIT', 'strength', 'weights', 'yoga', 'cycling',
@@ -181,37 +175,36 @@ def playlist_collect():
     ]
     
     print(f"Collecting from {len(queries)} search queries...")
-    print(f"Target: 200 playlists × 250 tracks = 50,000 records\n")
     
     all_playlists = []
     all_tracks = []
     
-    # Collect playlists
+    # collecting playlists
     for query in queries:
         print(f"\nSearching: {query}")
         playlists = search_playlists(query, limit=50)
         all_playlists.extend(playlists)
     
-    # Deduplicate playlists
+    # unique playlists only
     unique_playlists = {p['playlist_id']: p for p in all_playlists}.values()
-    unique_playlists = list(unique_playlists)[:200]  # Limit to 200
+    unique_playlists = list(unique_playlists)[:200]  # limiting to 200 playlists for manageability
     
-    print(f"\n✓ Found {len(unique_playlists)} unique playlists")
-    print(f"\nFetching tracks (this will take ~45-60 minutes)...\n")
+    print(f"\nFound {len(unique_playlists)} unique playlists")
+    print(f"\nFetching tracks, please wait!\n")
     
-    # Fetch tracks
+    # fetch tracks
     for i, playlist in enumerate(unique_playlists, 1):
         print(f"[{i}/{len(unique_playlists)}] {playlist['playlist_name'][:50]}...")
         
         tracks = fetch_playlist_tracks(playlist['playlist_id'])
         all_tracks.extend(tracks)
         
-        # Save in batches
+        # saving in batches
         if len(all_tracks) >= BATCH_SIZE:
             save_to_duckdb(all_playlists, all_tracks)
             all_tracks = []
         
-        # Progress updates
+        # progress update
         if i % 25 == 0:
             conn = duckdb.connect('data/processed/spotify.duckdb')
             total = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
@@ -219,11 +212,11 @@ def playlist_collect():
             conn.close()
             print(f"\n  Progress: {total:,} unique tracks, {entries:,} total entries\n")
     
-    # Save remaining
+    # save remaining tracks
     if all_tracks:
         save_to_duckdb(all_playlists, all_tracks)
     
-    # Final stats
+    # final stats
     conn = duckdb.connect('data/processed/spotify.duckdb')
     stats = {
         'playlists': conn.execute("SELECT COUNT(DISTINCT playlist_id) FROM playlists").fetchone()[0],
@@ -233,14 +226,11 @@ def playlist_collect():
     }
     conn.close()
     
-    print("\n" + "="*70)
-    print("✓ COLLECTION COMPLETE!")
-    print("="*70)
+    print("Collection is complete!")
     print(f"Unique tracks: {stats['tracks']:,}")
     print(f"Playlists: {stats['playlists']:,}")
     print(f"Total entries: {stats['entries']:,}")
     print(f"Unique artists: {stats['artists']:,}")
-    print("="*70)
 
 if __name__ == "__main__":
     playlist_collect()

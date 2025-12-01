@@ -1,10 +1,6 @@
--- ENHANCED SCHEMA FOR 100K+ RECORDS WITH TEMPORAL TRACKING
+-- Core Tables (for documentation purposes)
 
--- ============================================================================
--- CORE TABLES
--- ============================================================================
-
--- Playlists (with temporal snapshots)
+-- playlists
 CREATE TABLE IF NOT EXISTS playlists (
     playlist_id VARCHAR,
     snapshot_date DATE DEFAULT CURRENT_DATE,
@@ -22,14 +18,14 @@ CREATE TABLE IF NOT EXISTS playlists (
     PRIMARY KEY (playlist_id, snapshot_date)
 );
 
--- Tracks (master table - deduplicated)
+-- tracks (master table - deduplicated)
 CREATE TABLE IF NOT EXISTS tracks (
     track_id VARCHAR PRIMARY KEY,
     track_name VARCHAR,
-    track_name_clean VARCHAR,  -- Cleaned version for deduplication
+    track_name_clean VARCHAR,  -- cleaned ver 
     artist_id VARCHAR,
     artist_name VARCHAR,
-    artist_name_clean VARCHAR,  -- Cleaned version
+    artist_name_clean VARCHAR,  -- cleaned ver
     artist_genres VARCHAR,
     album_id VARCHAR,
     album_name VARCHAR,
@@ -44,12 +40,12 @@ CREATE TABLE IF NOT EXISTS tracks (
     is_local BOOLEAN,
     is_playable BOOLEAN,
     preview_url VARCHAR,
-    isrc VARCHAR,  -- International Standard Recording Code
+    isrc VARCHAR,  -- international standard recording code
     first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Playlist-Track associations (temporal)
+-- playlist-track associations (temporal)
 CREATE TABLE IF NOT EXISTS playlist_tracks (
     playlist_id VARCHAR,
     track_id VARCHAR,
@@ -58,12 +54,12 @@ CREATE TABLE IF NOT EXISTS playlist_tracks (
     position INTEGER,
     added_at TIMESTAMP,
     added_by_id VARCHAR,
-    is_removed BOOLEAN DEFAULT FALSE,  -- Track if track was removed
+    is_removed BOOLEAN DEFAULT FALSE,  -- if track was removed
     ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (playlist_id, track_id, snapshot_date)
 );
 
--- Artists (enriched data)
+-- artists (enriched data)
 CREATE TABLE IF NOT EXISTS artists (
     artist_id VARCHAR PRIMARY KEY,
     artist_name VARCHAR,
@@ -78,7 +74,7 @@ CREATE TABLE IF NOT EXISTS artists (
     last_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Albums (for album-based collection)
+-- albums (for album-based collection)
 CREATE TABLE IF NOT EXISTS albums (
     album_id VARCHAR PRIMARY KEY,
     album_name VARCHAR,
@@ -94,21 +90,19 @@ CREATE TABLE IF NOT EXISTS albums (
     first_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================================
--- TRACKING TABLES (Data Quality & Lineage)
--- ============================================================================
+-- Tracking Tables (Data Quality & Lineage)
 
--- Track where each track came from (data lineage)
+-- tracking where each track came from (data lineage)
 CREATE TABLE IF NOT EXISTS track_sources (
     track_id VARCHAR,
-    source_type VARCHAR,  -- 'playlist', 'artist_catalog', 'album', 'recommendation'
-    source_id VARCHAR,    -- playlist_id, artist_id, album_id, or seed_track_id
+    source_type VARCHAR, 
+    source_id VARCHAR,    
     source_name VARCHAR,
     discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (track_id, source_type, source_id)
 );
 
--- Track data quality issues
+-- track data quality issues
 CREATE SEQUENCE IF NOT EXISTS data_quality_issues_seq START 1;
 
 CREATE TABLE IF NOT EXISTS data_quality_issues (
@@ -134,25 +128,23 @@ CREATE TABLE IF NOT EXISTS api_call_log (
     called_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Track popularity over time (temporal analysis)
+-- tracking popularity over time (temporal analysis)
 CREATE TABLE IF NOT EXISTS track_popularity_history (
     track_id VARCHAR,
     snapshot_date DATE,
     popularity INTEGER,
-    playlist_count INTEGER,  -- How many playlists it appears in
+    playlist_count INTEGER,  -- how many playlists it appears in
     PRIMARY KEY (track_id, snapshot_date)
 );
 
--- ============================================================================
--- INDEXES FOR PERFORMANCE
--- ============================================================================
+-- Performance Indexes
 
--- Playlist indexes
+-- playlist indexes
 CREATE INDEX IF NOT EXISTS idx_playlist_category ON playlists(category);
 CREATE INDEX IF NOT EXISTS idx_playlist_snapshot ON playlists(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_playlist_followers ON playlists(follower_count DESC);
 
--- Track indexes
+-- track indexes
 CREATE INDEX IF NOT EXISTS idx_track_artist ON tracks(artist_name);
 CREATE INDEX IF NOT EXISTS idx_track_popularity ON tracks(popularity DESC);
 CREATE INDEX IF NOT EXISTS idx_track_release_year ON tracks(release_year);
@@ -160,30 +152,29 @@ CREATE INDEX IF NOT EXISTS idx_track_duration ON tracks(duration_ms);
 CREATE INDEX IF NOT EXISTS idx_track_explicit ON tracks(explicit);
 CREATE INDEX IF NOT EXISTS idx_track_name_clean ON tracks(track_name_clean);
 
--- Artist indexes
+-- artist indexes
 CREATE INDEX IF NOT EXISTS idx_artist_popularity ON artists(popularity DESC);
 CREATE INDEX IF NOT EXISTS idx_artist_followers ON artists(follower_count DESC);
 CREATE INDEX IF NOT EXISTS idx_artist_name_clean ON artists(artist_name_clean);
 
--- Playlist-track indexes
+-- playlist-track indexes
 CREATE INDEX IF NOT EXISTS idx_pt_playlist ON playlist_tracks(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_pt_track ON playlist_tracks(track_id);
 CREATE INDEX IF NOT EXISTS idx_pt_snapshot ON playlist_tracks(snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_pt_position ON playlist_tracks(position);
 
--- Source tracking indexes
+-- source tracking indexes
 CREATE INDEX IF NOT EXISTS idx_sources_track ON track_sources(track_id);
 CREATE INDEX IF NOT EXISTS idx_sources_type ON track_sources(source_type);
 
--- Temporal indexes
+-- temporal indexes
 CREATE INDEX IF NOT EXISTS idx_popularity_history_track ON track_popularity_history(track_id);
 CREATE INDEX IF NOT EXISTS idx_popularity_history_date ON track_popularity_history(snapshot_date);
 
--- ============================================================================
--- MATERIALIZED VIEWS (For Complex Analytics)
--- ============================================================================
 
--- Track statistics (aggregated)
+-- Views for Analytics
+
+-- track statistics (all together)
 CREATE TABLE IF NOT EXISTS track_stats AS
 SELECT 
     t.track_id,
@@ -199,7 +190,7 @@ LEFT JOIN playlist_tracks pt ON t.track_id = pt.track_id
 LEFT JOIN track_sources ts ON t.track_id = ts.track_id
 GROUP BY t.track_id, t.track_name, t.artist_name, t.popularity;
 
--- Category statistics
+-- category statistics
 CREATE TABLE IF NOT EXISTS category_stats AS
 SELECT 
     p.category,
